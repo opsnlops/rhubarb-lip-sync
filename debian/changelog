@@ -1,3 +1,10 @@
+rhubarb-lip-sync (1.14.0-2) unstable; urgency=medium
+
+  * Export resource-directory lookup via Debian patch.
+  * Apply patches with quilt in GitHub Debian workflow for CMake builds.
+
+ -- acw <acw@opsnlops.io>  Sun, 19 Oct 2025 12:12:15 -0700
+
 rhubarb-lip-sync (1.14.0-1) unstable; urgency=medium
 
   * Initial Debian packaging.

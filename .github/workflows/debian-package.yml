@@ -1,4 +1,4 @@
-name: Linux Builds
+name: Debian Package
 
 on:
   push:
@@ -25,12 +25,20 @@ jobs:
       - name: Install base packages
         run: |
           apt-get update
-          apt-get install -y git git-lfs cmake build-essential ninja-build libboost-all-dev curl debhelper dpkg-dev fakeroot
+          apt-get install -y git git-lfs cmake build-essential ninja-build libboost-all-dev curl debhelper dpkg-dev fakeroot quilt
 
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Apply Debian patches for CMake build
+        env:
+          QUILT_PATCHES: debian/patches
+        run: |
+          if [ -f "$QUILT_PATCHES/series" ] && grep -Eq '^[[:space:]]*[^#]' "$QUILT_PATCHES/series"; then
+            quilt push -a
+          fi
 
       - name: Configure CMake
         run: |
@@ -45,6 +53,14 @@ jobs:
 
       - name: Package (CPack ZIP)
         run: cmake --build "${BUILD_DIR}" --target package
+
+      - name: Revert Debian patches before package build
+        env:
+          QUILT_PATCHES: debian/patches
+        run: |
+          if [ -f "$QUILT_PATCHES/series" ] && grep -Eq '^[[:space:]]*[^#]' "$QUILT_PATCHES/series"; then
+            quilt pop -a
+          fi
 
       - name: Build Debian package
         run: dpkg-buildpackage -us -uc -b
