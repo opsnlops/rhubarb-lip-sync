@@ -10,8 +10,8 @@ jobs:
       matrix:
         include:
           - description: Windows - Visual Studio
-            os: windows-2019
-            cmakeOptions: '-G "Visual Studio 16 2019" -A x64'
+            os: windows-2022
+            cmakeOptions: '-G "Visual Studio 17 2022" -A x64'
             publish: true
           - description: macOS - Xcode
             os: macos-13

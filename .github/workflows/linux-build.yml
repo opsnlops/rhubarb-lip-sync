@@ -14,9 +14,9 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runner: ubuntu-24.04
+            runner: buildjet-8vcpu-ubuntu-2204
           - arch: arm64
-            runner: ubuntu-24.04-arm64
+            runner: buildjet-16vcpu-ubuntu-2204-arm
     env:
       BUILD_DIR: build
     container:
@@ -25,7 +25,7 @@ jobs:
       - name: Install base packages
         run: |
           apt-get update
-          apt-get install -y git git-lfs cmake build-essential ninja-build libboost-all-dev curl
+          apt-get install -y git git-lfs cmake build-essential ninja-build libboost-all-dev curl debhelper dpkg-dev fakeroot
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,6 +46,17 @@ jobs:
       - name: Package (CPack ZIP)
         run: cmake --build "${BUILD_DIR}" --target package
 
+      - name: Build Debian package
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect Debian artifacts
+        run: |
+          mkdir -p artifacts
+          mv ../rhubarb-lip-sync_*_${{ matrix.arch }}.deb artifacts/
+          if ls ../rhubarb-lip-sync-dbgsym_*_${{ matrix.arch }}.deb 1> /dev/null 2>&1; then
+            mv ../rhubarb-lip-sync-dbgsym_*_${{ matrix.arch }}.deb artifacts/
+          fi
+
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -53,3 +64,4 @@ jobs:
           path: |
             ${{ env.BUILD_DIR }}/rhubarb/rhubarb
             ${{ env.BUILD_DIR }}/*.zip
+            artifacts/*.deb
