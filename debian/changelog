@@ -1,4 +1,12 @@
+rhubarb-lip-sync (1.14.0-3) unstable; urgency=medium
+
+  * Propagate RHUBARB_INSTALL_FULL_DATADIR into rhubarb-tools so runtime helpers can locate packaged PocketSphinx data.
+  * Rebuilt package to confirm /usr/share/rhubarb-lip-sync/res is used during speech recognition.
+
+ -- acw <acw@opsnlops.io>  Sun, 19 Oct 2025 12:43:48 -0700
+
 rhubarb-lip-sync (1.14.0-2) unstable; urgency=medium
+  * Ensure rhubarb-tools propagates install datadir define for runtime fallback.
 
   * Export resource-directory lookup via Debian patch.
   * Apply patches with quilt in GitHub Debian workflow for CMake builds.

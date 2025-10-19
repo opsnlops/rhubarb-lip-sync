@@ -1,13 +1,21 @@
 Description: Locate installed data directory when searching for PocketSphinx resources
 Author: Codex Agent <codex@example.com>
 Forwarded: not-needed
-Last-Updated: 2025-02-14
+Last-Updated: 2025-10-19
 ---
 diff --git a/rhubarb/CMakeLists.txt b/rhubarb/CMakeLists.txt
-index b262cec..0b44335 100644
+index b262cec..0e30384 100644
 --- a/rhubarb/CMakeLists.txt
 +++ b/rhubarb/CMakeLists.txt
-@@ -526,6 +526,7 @@ target_link_libraries(rhubarb
+@@ -503,6 +503,7 @@ target_link_libraries(rhubarb-tools
+ 	utfcpp
+ 	utf8proc
+ )
++target_compile_definitions(rhubarb-tools PUBLIC RHUBARB_INSTALL_FULL_DATADIR="${CMAKE_INSTALL_FULL_DATADIR}/rhubarb-lip-sync")
+ 
+ # Define Rhubarb executable
+ add_executable(rhubarb
+@@ -526,6 +527,7 @@ target_link_libraries(rhubarb
  	rhubarb-lib
  )
  target_compile_options(rhubarb PUBLIC ${enableWarningsFlags})
