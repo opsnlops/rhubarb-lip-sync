@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=cmake --parallel
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DRHUBARB_BUILD_TESTS=OFF \
+		-DRHUBARB_BUILD_EXTRAS=OFF \
+		-DCMAKE_INSTALL_PREFIX=/usr
+
+override_dh_dwz:
+	@echo "Skipping dwz for rhubarb-lip-sync (unsupported debug sections)"
+
+override_dh_autoreconf:
+	@echo "Skipping autoreconf for bundled third-party sources"
+
+override_dh_autoreconf_clean:
+	@echo "Skipping autoreconf clean"
+
+override_dh_update_autotools_config:
+	@echo "Skipping autotools config updates"
+

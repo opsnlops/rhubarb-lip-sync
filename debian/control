@@ -1,0 +1,16 @@
+Source: rhubarb-lip-sync
+Section: sound
+Priority: optional
+Maintainer: April <april@opsnlops.io>
+Standards-Version: 4.7.0
+Homepage: https://github.com/DanielSWolf/rhubarb-lip-sync
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13), cmake, libboost-all-dev
+
+Package: rhubarb-lip-sync
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Automatic 2D lip-sync from voice recordings
+ Rhubarb Lip Sync analyzes audio files and generates mouth shape
+ animation data that can be imported into various 2D animation tools
+ or consumed from the command line.

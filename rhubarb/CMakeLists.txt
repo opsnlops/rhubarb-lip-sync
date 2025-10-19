@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.24)
 include(FetchContent)
 include("../appInfo.cmake")
 
+option(RHUBARB_BUILD_TESTS "Build Rhubarb Lip Sync unit tests" ON)
+
+include(GNUInstallDirs)
+
+set(RHUBARB_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/rhubarb-lip-sync")
+
 # Support legacy OS X versions
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version")
 
@@ -94,22 +100,24 @@ set_target_properties(pocketSphinx PROPERTIES FOLDER lib)
 include_directories(SYSTEM "lib/tclap-1.2.1/include")
 
 # ... Google Test
-set(INSTALL_GTEST OFF) # Prevent library files from ending up in our artifacts
-FetchContent_Declare(googletest
-	GIT_REPOSITORY https://github.com/google/googletest.git
-	GIT_TAG v1.16.0
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-target_compile_options(gmock PRIVATE ${disableWarningsFlags})
-set_target_properties(gmock PROPERTIES FOLDER lib)
-target_compile_options(gmock_main PRIVATE ${disableWarningsFlags})
-set_target_properties(gmock_main PROPERTIES FOLDER lib)
-target_compile_options(gtest PRIVATE ${disableWarningsFlags})
-set_target_properties(gtest PROPERTIES FOLDER lib)
-target_compile_options(gtest_main PRIVATE ${disableWarningsFlags})
-set_target_properties(gtest_main PROPERTIES FOLDER lib)
+if(RHUBARB_BUILD_TESTS)
+	set(INSTALL_GTEST OFF) # Prevent library files from ending up in our artifacts
+	FetchContent_Declare(googletest
+		GIT_REPOSITORY https://github.com/google/googletest.git
+		GIT_TAG v1.16.0
+	)
+	# For Windows: Prevent overriding the parent project's compiler/linker settings
+	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+	FetchContent_MakeAvailable(googletest)
+	target_compile_options(gmock PRIVATE ${disableWarningsFlags})
+	set_target_properties(gmock PROPERTIES FOLDER lib)
+	target_compile_options(gmock_main PRIVATE ${disableWarningsFlags})
+	set_target_properties(gmock_main PROPERTIES FOLDER lib)
+	target_compile_options(gtest PRIVATE ${disableWarningsFlags})
+	set_target_properties(gtest PROPERTIES FOLDER lib)
+	target_compile_options(gtest_main PRIVATE ${disableWarningsFlags})
+	set_target_properties(gtest_main PROPERTIES FOLDER lib)
+endif()
 
 # ... GSL
 include_directories(SYSTEM "lib/gsl/include")
@@ -520,26 +528,28 @@ target_link_libraries(rhubarb
 target_compile_options(rhubarb PUBLIC ${enableWarningsFlags})
 
 # Define test project
-set(TEST_FILES
-	tests/stringToolsTests.cpp
-	tests/TimelineTests.cpp
-	tests/BoundedTimelineTests.cpp
-	tests/ContinuousTimelineTests.cpp
-	tests/pairsTests.cpp
-	tests/tokenizationTests.cpp
-	tests/g2pTests.cpp
-	tests/LazyTests.cpp
-	tests/WaveFileReaderTests.cpp
-)
-add_executable(runTests ${TEST_FILES})
-target_link_libraries(runTests
-	gtest
-	gmock
-	gmock_main
-	rhubarb-recognition
-	rhubarb-time
-	rhubarb-audio
-)
+if(RHUBARB_BUILD_TESTS)
+	set(TEST_FILES
+		tests/stringToolsTests.cpp
+		tests/TimelineTests.cpp
+		tests/BoundedTimelineTests.cpp
+		tests/ContinuousTimelineTests.cpp
+		tests/pairsTests.cpp
+		tests/tokenizationTests.cpp
+		tests/g2pTests.cpp
+		tests/LazyTests.cpp
+		tests/WaveFileReaderTests.cpp
+	)
+	add_executable(runTests ${TEST_FILES})
+	target_link_libraries(runTests
+		gtest
+		gmock
+		gmock_main
+		rhubarb-recognition
+		rhubarb-time
+		rhubarb-audio
+	)
+endif()
 
 # Copies the specified files in a post-build event, then installs them
 function(copy_and_install sourceGlob relativeTargetDirectory)
@@ -560,7 +570,7 @@ function(copy_and_install sourceGlob relativeTargetDirectory)
 			# Install file
 			install(
 				FILES "${sourcePath}"
-				DESTINATION "${relativeTargetDirectory}"
+				DESTINATION "${RHUBARB_INSTALL_DATADIR}/${relativeTargetDirectory}"
 			)
 		endif()
 	endforeach()
@@ -588,10 +598,12 @@ endfunction()
 copy_and_install("lib/pocketsphinx-rev13216/model/en-us/*" "res/sphinx")
 copy_and_install("lib/cmusphinx-en-us-5.2/*" "res/sphinx/acoustic-model")
 
-copy_and_install("tests/resources/*" "tests/resources")
+if(RHUBARB_BUILD_TESTS)
+	copy_and_install("tests/resources/*" "tests/resources")
+endif()
 
 install(
 	TARGETS rhubarb
 	RUNTIME
-	DESTINATION .
+	DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

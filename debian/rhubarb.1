@@ -1,0 +1,91 @@
+.TH RHUBARB 1 "October 2025" "rhubarb-lip-sync 1.14.0" "User Commands"
+.SH NAME
+rhubarb \- generate mouth animation data from dialog recordings
+.SH SYNOPSIS
+.B rhubarb
+.RI [ options ]
+.I input.wav
+.SH DESCRIPTION
+Rhubarb Lip Sync analyses an input WAVE audio file and emits lip-sync data
+for 2D animation pipelines. The tool can export multiple output formats and
+provides tunable recognition behaviour for different production workflows.
+.PP
+The command expects a PCM WAVE input file and writes the generated
+animation file to standard output or to the path supplied with
+.BR -o .
+.SH OPTIONS
+.TP
+.BR -r ,\ --recognizer " " \fIpocketSphinx\fR\fB|\fIphonetic\fR
+Select the recognition backend. The PocketSphinx recognizer performs full
+speech recognition, while the phonetic recognizer uses a quick phoneme model.
+Default: pocketSphinx.
+.TP
+.BR -f ,\ --exportFormat " " \fIdat\fR\fB|\fItsv\fR\fB|\fIxml\fR\fB|\fIjson\fR
+Choose the output format for the generated animation data. The default is
+\fItsv\fR.
+.TP
+.B --datFrameRate \fInumber\fR
+Override the frame rate used by the DAT exporter.
+.TP
+.B --datUsePrestonBlair
+For DAT exports, use Preston Blair mouth shape names instead of the defaults.
+.TP
+.BR -d ,\ --dialogFile " " \fIpath\fR
+Read dialog text from \fIpath\fR to aid recognition.
+.TP
+.B --extendedShapes \fIstring\fR
+Enable extended optional mouth shapes. Provide a comma-separated list such
+as \fIextendedShapes=GHX\fR.
+.TP
+.B --threads \fIn\fR
+Limit the number of worker threads Rhubarb may use. The default uses all
+available cores.
+.TP
+.BR -q ,\ --quiet
+Suppress informative output; only warnings and errors are printed to
+standard error.
+.TP
+.B --machineReadable
+Emit structured JSON progress messages on standard error. Useful for tool
+integrations.
+.TP
+.B --consoleLevel \fIlevel\fR
+Set the minimum log level sent to standard error. Accepted levels are
+\fITrace\fR, \fIDebug\fR, \fIInfo\fR, \fIWarn\fR, \fIError\fR, and \fIFatal\fR.
+Default: Info.
+.TP
+.B --logFile \fIpath\fR
+Write log messages to the specified file.
+.TP
+.B --logLevel \fIlevel\fR
+Set the minimum log level written to the log file. Levels match those
+accepted by \fB--consoleLevel\fR.
+.TP
+.BR -o ,\ --output " " \fIpath\fR
+Write the generated animation data to \fIpath\fR instead of standard output.
+.TP
+.B --version
+Show version information and exit.
+.TP
+.BR -h ,\ --help
+Display command help and exit.
+.SH EXIT STATUS
+The command exits with status 0 on success. Non-zero status codes indicate
+an error; diagnostic information is written to standard error.
+.SH EXAMPLES
+.PP
+Generate lip sync data in JSON format for a dialog clip:
+.PP
+.EX
+rhubarb -f json -o scene01.json audio/scene01.wav
+.EE
+.PP
+Export a DAT file with Preston Blair shapes at 30 fps:
+.PP
+.EX
+rhubarb -f dat --datUsePrestonBlair --datFrameRate 30 -o scene.dat audio/scene.wav
+.EE
+.SH SEE ALSO
+.BR rhubarb (https://github.com/DanielSWolf/rhubarb-lip-sync)
+.SH AUTHOR
+Written by Daniel Wolf. Debian packaging and man page by April <april@opsnlops.io>.

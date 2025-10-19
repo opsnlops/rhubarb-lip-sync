@@ -1,0 +1,55 @@
+name: Linux Builds
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build-linux:
+    name: Build on ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm64
+    env:
+      BUILD_DIR: build
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install base packages
+        run: |
+          apt-get update
+          apt-get install -y git git-lfs cmake build-essential ninja-build libboost-all-dev curl
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B "${BUILD_DIR}" \
+            -G Ninja \
+            -DRHUBARB_BUILD_TESTS=OFF \
+            -DRHUBARB_BUILD_EXTRAS=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build "${BUILD_DIR}"
+
+      - name: Package (CPack ZIP)
+        run: cmake --build "${BUILD_DIR}" --target package
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rhubarb-${{ matrix.arch }}
+          path: |
+            ${{ env.BUILD_DIR }}/rhubarb/rhubarb
+            ${{ env.BUILD_DIR }}/*.zip

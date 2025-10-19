@@ -4,18 +4,24 @@ include(appInfo.cmake)
 
 project(${appName})
 
+option(RHUBARB_BUILD_EXTRAS "Build and install optional extras" ON)
+
+include(GNUInstallDirs)
+
 # Build and install main executable
 add_subdirectory(rhubarb)
 
 # Build and install extras
-add_subdirectory("extras/AdobeAfterEffects")
-add_subdirectory("extras/MagixVegas")
-add_subdirectory("extras/EsotericSoftwareSpine")
+if(RHUBARB_BUILD_EXTRAS)
+	add_subdirectory("extras/AdobeAfterEffects")
+	add_subdirectory("extras/MagixVegas")
+	add_subdirectory("extras/EsotericSoftwareSpine")
+endif()
 
 # Install misc. files
 install(
 	FILES README.adoc LICENSE.md CHANGELOG.md
-	DESTINATION .
+	DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/rhubarb-lip-sync
 )
 
 # Configure CPack

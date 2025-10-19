@@ -1,0 +1,5 @@
+rhubarb-lip-sync (1.14.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+
+ -- April <april@opsnlops.io>  Sat, 18 Oct 2025 19:14:54 -0700
