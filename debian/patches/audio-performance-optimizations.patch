@@ -1,0 +1,206 @@
+Description: Improve audio processing throughput via batching and caching
+Author: Codex Agent <codex@example.com>
+Forwarded: not-needed
+Last-Updated: 2025-10-20
+---
+diff --git a/rhubarb/src/audio/DcOffset.cpp b/rhubarb/src/audio/DcOffset.cpp
+index afb9e71..2a5bc4b 100644
+--- a/rhubarb/src/audio/DcOffset.cpp
++++ b/rhubarb/src/audio/DcOffset.cpp
+@@ -1,5 +1,7 @@
+ #include "DcOffset.h"
+ #include <cmath>
++#include <vector>
++#include <algorithm>
+ 
+ using std::unique_ptr;
+ using std::make_unique;
+@@ -40,13 +42,36 @@ float getDcOffset(const AudioClip& audioClip) {
+ 
+ 	const auto read = audioClip.createSampleReader();
+ 	double sum = 0;
+-	for (int i = 0; i < flatMeanSampleCount; ++i) {
+-		sum += read(i);
++
++	// Read samples in batches for better performance
++	constexpr int batchSize = 4096;
++	std::vector<float> batch;
++	batch.reserve(batchSize);
++
++	// Process flat mean samples in batches
++	for (int i = 0; i < flatMeanSampleCount; i += batchSize) {
++		const int samplesToRead = std::min(batchSize, flatMeanSampleCount - i);
++		batch.resize(samplesToRead);
++		for (int j = 0; j < samplesToRead; ++j) {
++			batch[j] = read(i + j);
++		}
++		for (int j = 0; j < samplesToRead; ++j) {
++			sum += batch[j];
++		}
+ 	}
+-	for (int i = 0; i < fadingMeanSampleCount; ++i) {
+-		const double weight =
+-			static_cast<double>(fadingMeanSampleCount - i) / fadingMeanSampleCount;
+-		sum += read(flatMeanSampleCount + i) * weight;
++
++	// Process fading mean samples in batches
++	for (int i = 0; i < fadingMeanSampleCount; i += batchSize) {
++		const int samplesToRead = std::min(batchSize, fadingMeanSampleCount - i);
++		batch.resize(samplesToRead);
++		for (int j = 0; j < samplesToRead; ++j) {
++			batch[j] = read(flatMeanSampleCount + i + j);
++		}
++		for (int j = 0; j < samplesToRead; ++j) {
++			const double weight =
++				static_cast<double>(fadingMeanSampleCount - (i + j)) / fadingMeanSampleCount;
++			sum += batch[j] * weight;
++		}
+ 	}
+ 
+ 	const double totalWeight = flatMeanSampleCount + (fadingMeanSampleCount + 1) / 2.0;
+diff --git a/rhubarb/src/audio/SampleRateConverter.cpp b/rhubarb/src/audio/SampleRateConverter.cpp
+index 665a7e5..cfbc53d 100644
+--- a/rhubarb/src/audio/SampleRateConverter.cpp
++++ b/rhubarb/src/audio/SampleRateConverter.cpp
+@@ -2,6 +2,8 @@
+ #include "SampleRateConverter.h"
+ #include <stdexcept>
+ #include <format.h>
++#include <vector>
++#include <algorithm>
+ 
+ using std::invalid_argument;
+ using std::unique_ptr;
+@@ -51,15 +53,65 @@ float mean(double inputStart, double inputEnd, const SampleReader& read) {
+ }
+ 
+ SampleReader SampleRateConverter::createUnsafeSampleReader() const {
++	// Use a cache to avoid redundant reads of input samples
++	// This significantly improves performance when downsampling
+ 	return [
+ 		read = inputClip->createSampleReader(),
+ 		downscalingFactor = downscalingFactor,
+-		size = inputClip->size()
+-		](size_type index) {
++		size = inputClip->size(),
++		cache = std::make_shared<std::vector<float>>(),
++		cacheStartIndex = static_cast<int64_t>(-1),
++		cacheSize = static_cast<size_t>(0)
++		](size_type index) mutable {
+ 		const double inputStart = index * downscalingFactor;
+ 		const double inputEnd =
+ 			std::min((index + 1) * downscalingFactor, static_cast<double>(size));
+-		return mean(inputStart, inputEnd, read);
++
++		// Determine the range of input samples we need
++		const int64_t startIndex = static_cast<int64_t>(inputStart);
++		const int64_t endIndex = std::min(
++			static_cast<int64_t>(inputEnd) + 1,
++			static_cast<int64_t>(size)
++		);
++
++		// Check if we need to refill the cache
++		const int64_t cacheEndIndex = cacheStartIndex + static_cast<int64_t>(cacheSize);
++		if (startIndex < cacheStartIndex || endIndex > cacheEndIndex) {
++			// Refill cache with a generous buffer (4096 samples)
++			constexpr size_t bufferSize = 4096;
++			cacheStartIndex = startIndex;
++			cacheSize = std::min(
++				bufferSize,
++				static_cast<size_t>(size - startIndex)
++			);
++			cache->resize(cacheSize);
++			for (size_t i = 0; i < cacheSize; ++i) {
++				(*cache)[i] = read(cacheStartIndex + i);
++			}
++		}
++
++		// Use cached read function
++		auto cachedRead = [&](int64_t idx) -> float {
++			return (*cache)[idx - cacheStartIndex];
++		};
++
++		// Calculate weighted sum using cached values
++		double sum = 0;
++
++		// First sample (weight <= 1)
++		sum += cachedRead(startIndex) * ((startIndex + 1) - inputStart);
++
++		// Middle samples (weight 1 each)
++		for (int64_t idx = startIndex + 1; idx < endIndex; ++idx) {
++			sum += cachedRead(idx);
++		}
++
++		// Last sample (weight < 1)
++		if (endIndex < inputEnd) {
++			sum += cachedRead(endIndex) * (inputEnd - endIndex);
++		}
++
++		return static_cast<float>(sum / (inputEnd - inputStart));
+ 	};
+ }
+ 
+ diff --git a/rhubarb/src/audio/WaveFileReader.cpp b/rhubarb/src/audio/WaveFileReader.cpp
+index 3cb04c5..d80591f 100644
+--- a/rhubarb/src/audio/WaveFileReader.cpp
++++ b/rhubarb/src/audio/WaveFileReader.cpp
+@@ -2,6 +2,7 @@
+ #include "WaveFileReader.h"
+ #include "ioTools.h"
+ #include <iostream>
++#include <vector>
+ #include "tools/platformTools.h"
+ #include "tools/fileTools.h"
+ 
+@@ -229,21 +230,43 @@ inline AudioClip::value_type readSample(
+ }
+ 
+ SampleReader WaveFileReader::createUnsafeSampleReader() const {
++	// Use a buffered reader for much better I/O performance
++	constexpr size_t bufferCapacity = 16384; // 16K samples ~= 64KB buffer
++
+ 	return
+ 		[
+ 			formatInfo = formatInfo,
+ 			file = std::make_shared<std::ifstream>(openFile(filePath)),
+-			filePos = std::streampos(0)
++			buffer = std::make_shared<std::vector<value_type>>(),
++			bufferStartIndex = static_cast<size_type>(-1),
++			bufferCapacity
+ 		](size_type index) mutable {
+-		const std::streampos newFilePos = formatInfo.dataOffset
+-			+ static_cast<streamoff>(index * formatInfo.bytesPerFrame);
+-		if (newFilePos != filePos) {
+-			file->seekg(newFilePos);
++		// Check if the requested sample is in the buffer
++		const size_type bufferEndIndex = bufferStartIndex + static_cast<size_type>(buffer->size());
++		if (index < bufferStartIndex || index >= bufferEndIndex) {
++			// Sample not in buffer - need to refill
++			bufferStartIndex = index;
++			buffer->clear();
++			buffer->reserve(bufferCapacity);
++
++			// Seek to the correct position
++			const std::streampos filePos = formatInfo.dataOffset
++				+ static_cast<streamoff>(index * formatInfo.bytesPerFrame);
++			file->seekg(filePos);
++
++			// Read samples into buffer
++			const size_type samplesToRead = std::min(
++				bufferCapacity,
++				static_cast<size_t>(formatInfo.frameCount - index)
++			);
++			for (size_type i = 0; i < samplesToRead; ++i) {
++				if (!file->good()) break;
++				buffer->push_back(readSample(*file, formatInfo.sampleFormat, formatInfo.channelCount));
++			}
+ 		}
+-		const value_type result =
+-			readSample(*file, formatInfo.sampleFormat, formatInfo.channelCount);
+-		filePos = newFilePos + static_cast<streamoff>(formatInfo.bytesPerFrame);
+-		return result;
++
++		// Return sample from buffer
++		return (*buffer)[index - bufferStartIndex];
+ 	};
+ }

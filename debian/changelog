@@ -1,3 +1,10 @@
+rhubarb-lip-sync (1.14.0-4) unstable; urgency=medium
+
+  * Add audio-performance-optimizations Quilt patch for buffered sample IO
+    and cached resampling to speed up lip-sync analysis.
+
+ -- April White <april@opsnlops.io>  Tue, 28 Oct 2025 17:08:06 -0700
+
 rhubarb-lip-sync (1.14.0-3) unstable; urgency=medium
 
   * Propagate RHUBARB_INSTALL_FULL_DATADIR into rhubarb-tools so runtime helpers can locate packaged PocketSphinx data.
